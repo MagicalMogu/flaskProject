@@ -2,19 +2,24 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" type="text/css">
     <title>{{ name }}'s WatchList</title>
+    <link rel="icon" href="{{ url_for('static', filename='movies_icon.png') }}">
 </head>
 <body>
+    <img alt="Avatar" class="avatar" src="{{ url_for('static', filename='images/avatar.png') }}">
     <h2>{{ name }}'s WatchList</h2>
     {#使用length过滤器获取movies变量长度#}
     <p>{{ movies|length }} Titles</p>
-    <ul>
+    <ul class="movie-list">
         {% for movie in movies %} {# 迭代，形成无序列表 #}
         <li>{{ movie.title }} - {{ movie.year }}</li> {# list item #}
         {% endfor %}
     </ul>
+    <img class="totoro" alt="Totoro" src="{{ url_for('static', filename="images/totoro.gif") }}">
+
     <footer>
-        <small>&copy; 2023 by xzp</small>
+        <small> &copy; 2023 </small>
     </footer>
 </body>
 </html>
