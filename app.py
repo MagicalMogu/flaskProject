@@ -3,12 +3,18 @@ from flask import escape
 from flask_sqlalchemy import SQLAlchemy
 import os
 import click
+from werkzeug.security import generate_password_hash, check_password_hash
+from flask_login import *
 
 app = Flask(__name__)
+
 # 设置变量
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:////' + os.path.join(app.root_path, 'data.db')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False  # 关闭对模型修改的监控
 app.config['SECRET_KEY'] = 'dev'  # flash用密钥
+# instance of extend
+login_manager = LoginManager(app)
+login_manager.login_view = 'login'
 db = SQLAlchemy(app)
 
 
@@ -48,16 +54,52 @@ def forge():
     click.echo('Done.')
 
 
+# 设置管理员用户
+@app.cli.command()
+@click.option('--username', prompt=True, help='The username used to login.')
+@click.option('--password', prompt=True, hide_input=True, confirmation_prompt=True, help='The password used to login.')
+def admin(username, password):
+    db.create_all()
+
+    user = User.query.first()
+    if user is not None:
+        click.echo('正在更新用户...')
+        user.name = username
+        user.set_password(password)
+    else:
+        click.echo('创建用户...')
+        user = User(name=username)
+        user.set_password(password)
+        db.session.add(user)
+    db.session.commit()
+    click.echo('Done.')
+
+
 # 继承自db的model，表示一个表
-class User(db.Model):
+# 继承UserMixin，拥有判断用户状态的很多函数
+class User(db.Model, UserMixin):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(20))
+    password_hash = db.Column(db.String(128))
+
+    def set_password(self, password):
+        self.password_hash = generate_password_hash(password)
+
+    def valid_password(self, password):
+        return check_password_hash(self.password_hash, password)
 
 
 class Movie(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(60))
     year = db.Column(db.String(4))
+
+
+@login_manager.user_loader
+# 根据id加载用户
+def load_user(user_id):
+    user = User.query.get(int(user_id))
+    return user
 
 
 # 模版上下文处理函数
@@ -74,6 +116,11 @@ def inject_user():
 @app.route('/', methods=['GET', 'POST'])
 def index():
     if request.method == 'POST':
+
+        if not current_user.is_authenticated:
+            flash('当前用户未认证')
+            return redirect(url_for('index'))
+
         title = request.form.get('title')
         year = request.form.get('year')
         # 重回主页
@@ -128,6 +175,7 @@ def test_url_for():
 
 # 编辑movies
 @app.route('/movie/edit/<int:movie_id>', methods=['GET', 'POST'])
+@login_required
 def edit(movie_id):
     movie = Movie.query.get_or_404(movie_id)
     if request.method == 'POST':
@@ -143,10 +191,61 @@ def edit(movie_id):
         return redirect(url_for('index'))  # 重定向回主页
     return render_template('edit.html', movie=movie)
 
+
 @app.route('/movie/delete/<int:movie_id>', methods=['GET', 'POST'])
+@login_required
 def delete(movie_id):
     movie = Movie.query.get_or_404(movie_id)
     db.session.delete(movie)
     db.session.commit()
     flash('删除成功')
     return redirect(url_for('index'))
+
+
+# 登陆界面
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        username = request.form['username']
+        password = request.form['password']
+
+        user = User.query.first()
+
+        # 验证
+        if user.name == username and user.valid_password(password):
+            login_user(user)
+            flash('登陆成功')
+            return redirect(url_for('index'))
+        else:
+            flash('用户名或密码错误')
+            return redirect(url_for('login'))
+    return render_template('login.html')
+
+
+@app.route('/logout')
+@login_required  # 装饰器 view保护
+def logout():
+    logout_user()
+    flash('Goodbye')
+    return redirect(url_for('index'))
+
+
+@app.route('/setting', methods=['POST', 'GET'])
+@login_required
+def setting():
+    if request.method == 'POST':
+        name = request.form['name']
+
+        if len(name) > 20:
+            flash('用户名过长')
+            return redirect(url_for('setting'))
+
+        current_user.name = name
+        # current_user 会返回当前登录用户的数据库记录对象
+        # 等同于下面的用法
+        # user = User.query.first()
+        # user.name = name
+        db.session.commit()
+        flash('用户名更新成功')
+        return redirect(url_for('index'))
+    return render_template('setting.html')
