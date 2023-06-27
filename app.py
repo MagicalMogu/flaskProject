@@ -1,4 +1,4 @@
-from flask import Flask, url_for, render_template
+from flask import Flask, url_for, render_template, request, flash, redirect
 from flask import escape
 from flask_sqlalchemy import SQLAlchemy
 import os
@@ -8,6 +8,7 @@ app = Flask(__name__)
 # 设置变量
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:////' + os.path.join(app.root_path, 'data.db')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False  # 关闭对模型修改的监控
+app.config['SECRET_KEY'] = 'dev'  # flash用密钥
 db = SQLAlchemy(app)
 
 
@@ -69,8 +70,22 @@ def inject_user():
 
 
 # 渲染index页面，模版文件名是必须传入参数，其他两个参数为了正确渲染。
-@app.route('/')
+# 默认只接收GET，需要扩展POST接收表单
+@app.route('/', methods=['GET', 'POST'])
 def index():
+    if request.method == 'POST':
+        title = request.form.get('title')
+        year = request.form.get('year')
+        # 重回主页
+        if not title or not year or len(year) != 4 or len(title) > 60:
+            flash('错误的输入')
+            return redirect(url_for('index'))
+        # 保存到数据库
+        movie = Movie(title=title, year=year)
+        db.session.add(movie)
+        db.session.commit()
+        flash('创建成功')
+        return redirect(url_for('index'))
     # 查询数据库中记录
     # user = User.query.first()
     movies = Movie.query.all()
@@ -107,5 +122,31 @@ def test_url_for():
     print(url_for('test_url_for', num=2))  # 输出：/test?num=2
     return 'Test page'
 
+
 # if __name__ == '__main__':
 #     app.run()
+
+# 编辑movies
+@app.route('/movie/edit/<int:movie_id>', methods=['GET', 'POST'])
+def edit(movie_id):
+    movie = Movie.query.get_or_404(movie_id)
+    if request.method == 'POST':
+        title = request.form.get('title')
+        year = request.form.get('year')
+        if not title or not year or len(year) != 4 or len(title) > 60:
+            flash('错误的输入')
+            return redirect(url_for('edit', movie_id=movie_id))  # 重定向回对应的编辑页面
+        movie.title = title  # 更新标题
+        movie.year = year  # 更新年份
+        db.session.commit()  # 提交数据库会话
+        flash('更新成功')
+        return redirect(url_for('index'))  # 重定向回主页
+    return render_template('edit.html', movie=movie)
+
+@app.route('/movie/delete/<int:movie_id>', methods=['GET', 'POST'])
+def delete(movie_id):
+    movie = Movie.query.get_or_404(movie_id)
+    db.session.delete(movie)
+    db.session.commit()
+    flash('删除成功')
+    return redirect(url_for('index'))
