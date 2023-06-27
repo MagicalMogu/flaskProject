@@ -18,7 +18,8 @@ def initdb(drop):
     if drop:
         db.drop_all()
     db.create_all()
-    click.echo('Initialized database.') # 输出提示信息
+    click.echo('Initialized database.')  # 输出提示信息
+
 
 # 命令，创建虚拟数据
 @app.cli.command()
@@ -45,10 +46,12 @@ def forge():
     db.session.commit()
     click.echo('Done.')
 
+
 # 继承自db的model，表示一个表
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(20))
+
 
 class Movie(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -56,14 +59,27 @@ class Movie(db.Model):
     year = db.Column(db.String(4))
 
 
+# 模版上下文处理函数
+# 这个函数返回的变量（以字典键值对的形式）
+# 将会统一注入到每一个模板的上下文环境中，因此可以直接在模板中使用。
+@app.context_processor
+def inject_user():
+    user = User.query.first()
+    return dict(user=user)
+
 
 # 渲染index页面，模版文件名是必须传入参数，其他两个参数为了正确渲染。
 @app.route('/')
 def index():
     # 查询数据库中记录
-    user = User.query.first()
+    # user = User.query.first()
     movies = Movie.query.all()
-    return render_template('index.html', name=user.name, movies=movies)
+    return render_template('index.html', movies=movies)
+
+
+@app.errorhandler(404)
+def page_not_found(e):
+    return render_template('404.html'), 404
 
 
 @app.route('/hello')
