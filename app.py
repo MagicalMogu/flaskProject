@@ -1,3 +1,5 @@
+from sys import prefix
+
 from flask import Flask, url_for, render_template, request, flash, redirect
 from flask import escape
 from flask_sqlalchemy import SQLAlchemy
@@ -9,9 +11,9 @@ from flask_login import *
 app = Flask(__name__)
 
 # 设置变量
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:////' + os.path.join(app.root_path, 'data.db')
+app.config['SQLALCHEMY_DATABASE_URI'] = prefix + os.path.join(os.path.dirname(app.root_path), os.getenv('DATABASE_FILE', 'data.db'))
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False  # 关闭对模型修改的监控
-app.config['SECRET_KEY'] = 'dev'  # flash用密钥
+app.config['SECRET_KEY'] = ['SECRET_KEY', 'dev']  # flash用密钥
 # instance of extend
 login_manager = LoginManager(app)
 login_manager.login_view = 'login'
