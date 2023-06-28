@@ -214,10 +214,10 @@ def login():
         # 验证
         if user.name == username and user.valid_password(password):
             login_user(user)
-            flash('登陆成功')
+            flash('Login success.')
             return redirect(url_for('index'))
         else:
-            flash('用户名或密码错误')
+            flash('Invalid username or password.')
             return redirect(url_for('login'))
     return render_template('login.html')
 
@@ -226,7 +226,7 @@ def login():
 @login_required  # 装饰器 view保护
 def logout():
     logout_user()
-    flash('Goodbye')
+    flash('Goodbye.')
     return redirect(url_for('index'))
 
 
@@ -236,8 +236,8 @@ def setting():
     if request.method == 'POST':
         name = request.form['name']
 
-        if len(name) > 20:
-            flash('用户名过长')
+        if len(name) > 20 or not name:
+            flash('用户名过长或为空')
             return redirect(url_for('setting'))
 
         current_user.name = name
